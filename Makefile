@@ -63,5 +63,6 @@ $(BUILD_DIR)/%.htmltc: %.htmlt $(HTMLTPP) $(HEADERS) Makefile
 clean:
 	@echo "CLEAN $(BUILD_DIR)"
 	@rm -Rf $(BUILD_DIR)
-	@rm tests/catch.hpp.pch
+	@echo "CLEAN tests/catch.hpp.pch"
+	@rm -f tests/catch.hpp.pch
 
