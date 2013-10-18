@@ -3,7 +3,7 @@ BUILD_DIR := build
 
 CXX := clang++ -std=c++11
 
-CXXFLAGS_common  := -Iinclude -Ibuild -Weverything -Wno-c++98-compat -Wno-c++98-compat-pedantic -Wno-c99-extensions -Wno-exit-time-destructors -Wno-missing-variable-declarations
+CXXFLAGS_common  := -Iinclude -Ibuild -Weverything -Wno-c++98-compat -Wno-c++98-compat-pedantic -Wno-c99-extensions -Wno-exit-time-destructors -Wno-missing-variable-declarations -Wno-non-virtual-dtor -Wno-delete-non-virtual-dtor -Wno-weak-vtables -Wno-global-constructors
 CXXFLAGS_release := $(CXXFLAGS_common) -O3 -flto -s
 
 ifeq ($(RELEASE), y)
@@ -30,12 +30,23 @@ TEST := $(BUILD_DIR)/test
 TEST_TEMPLATES_SOURCES := $(wildcard tests/templates/*.htmlt)
 TEST_TEMPLATES := $(addprefix $(BUILD_DIR)/,$(TEST_TEMPLATES_SOURCES:.htmlt=.htmltc))
 
+BENCHMARK_SOURCE := benchmarks/main.cpp
+BENCHMARK := $(BUILD_DIR)/benchmark
+
+BENCHMARK_TEMPLATES_SOURCES := $(wildcard benchmarks/templates/*.htmlt)
+BENCHMARK_TEMPLATES := $(addprefix $(BUILD_DIR)/,$(BENCHMARK_TEMPLATES_SOURCES:.htmlt=.htmltc))
+
+
 
 .DEFAULT: $(HTMLTPP)
 
-all: test
+all: $(HTMLTPP) test benchmark
 
 test: $(TEST)
+	@echo "RUN   $<"
+	@$<
+
+benchmark: $(BENCHMARK)
 	@echo "RUN   $<"
 	@$<
 
@@ -53,6 +64,11 @@ $(TEST): $(TEST_SOURCE) $(TEST_TEMPLATES) $(HEADERS) $(PRECOMPILED_HEADER) Makef
 	@echo "BUILD $@"
 	@mkdir -p $(dir $@)
 	@$(CXX) -DCATCH_CONFIG_MAIN -include "tests/catch.hpp" $(CXXFLAGS_debug) $< -o $@
+
+$(BENCHMARK): $(BENCHMARK_SOURCE) $(BENCHMARK_TEMPLATES) $(HEADERS) Makefile
+	@echo "BUILD $@"
+	@mkdir -p $(dir $@)
+	@$(CXX) $(CXXFLAGS_release) $< -o $@
 
 $(BUILD_DIR)/%.htmltc: %.htmlt $(HTMLTPP) $(HEADERS) Makefile
 	@echo "PREPROCESS $<"
