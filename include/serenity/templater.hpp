@@ -1,6 +1,6 @@
 #pragma once
 
-//#include <sstream>
+#include <sstream>
 
-#define __TEMPLATER_HPP__INCLUDED__
+#define __SERENITY_TEMPLATER_HPP__INCLUDED__
 

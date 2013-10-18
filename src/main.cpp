@@ -136,8 +136,8 @@ private:
 
 	std::string fileStart() const {
 		return "[&]() {\n"
-			"#ifndef __TEMPLATER_HPP__INCLUDED__\n"
-			"#error \"You must include common/templater.hpp to use templates\"\n"
+			"#ifndef __SERENITY_TEMPLATER_HPP__INCLUDED__\n"
+			"#error \"You must #include <serenity/templater.hpp> to use templates\"\n"
 			"#endif\n"
 			"std::stringstream __res;";
 	}
