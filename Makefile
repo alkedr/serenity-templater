@@ -3,7 +3,7 @@ BUILD_DIR := build
 
 CXX := clang++ -std=c++11
 
-CXXFLAGS_common  := -Iinclude -Ibuild -Weverything -Wno-c++98-compat -Wno-c++98-compat-pedantic -Wno-c99-extensions -Wno-exit-time-destructors -Wno-missing-variable-declarations -Wno-non-virtual-dtor -Wno-delete-non-virtual-dtor -Wno-weak-vtables -Wno-global-constructors
+CXXFLAGS_common  := -Iinclude -Ibuild -Weverything -Wno-c++98-compat -Wno-c++98-compat-pedantic -Wno-global-constructors -Wno-exit-time-destructors -Wno-missing-variable-declarations
 CXXFLAGS_release := $(CXXFLAGS_common) -O3 -flto -s
 
 ifeq ($(RELEASE), y)
@@ -28,25 +28,21 @@ TEST_SOURCE := tests/main.cpp
 TEST := $(BUILD_DIR)/test
 
 TEST_TEMPLATES_SOURCES := $(wildcard tests/templates/*.htmlt)
-TEST_TEMPLATES := $(addprefix $(BUILD_DIR)/,$(TEST_TEMPLATES_SOURCES:.htmlt=.htmltc))
+TEST_TEMPLATES := $(BUILD_DIR)/tests/templates.htmltc
 
 BENCHMARK_SOURCE := benchmarks/main.cpp
 BENCHMARK := $(BUILD_DIR)/benchmark
 
 BENCHMARK_TEMPLATES_SOURCES := $(wildcard benchmarks/templates/*.htmlt)
-BENCHMARK_TEMPLATES := $(addprefix $(BUILD_DIR)/,$(BENCHMARK_TEMPLATES_SOURCES:.htmlt=.htmltc))
+BENCHMARK_TEMPLATES := $(BUILD_DIR)/benchmarks/templates.htmltc
 
 
 
 .DEFAULT: $(HTMLTPP)
 
-all: $(HTMLTPP) test benchmark
+all: $(HTMLTPP) run-test run-benchmark
 
-test: $(TEST)
-	@echo "RUN   $<"
-	@$<
-
-benchmark: $(BENCHMARK)
+run-%: build/%
 	@echo "RUN   $<"
 	@$<
 
@@ -55,30 +51,32 @@ $(PRECOMPILED_HEADER): tests/catch.hpp Makefile
 	@mkdir -p $(dir $@)
 	@$(CXX) -x c++-header -DCATCH_CONFIG_MAIN -Wno-unused-macros $(CXXFLAGS_debug) $< -o $@
 
-$(HTMLTPP): $(HTMLTPP_SOURCE) $(HEADERS) Makefile
+$(HTMLTPP): $(HTMLTPP_SOURCE) include Makefile
 	@echo "BUILD $@"
 	@mkdir -p $(dir $@)
-	@$(CXX) $(CXXFLAGS) $< -o $@
+	@$(CXX) $(CXXFLAGS) -lboost_program_options $< -o $@
 
-$(TEST): $(TEST_SOURCE) $(TEST_TEMPLATES) $(HEADERS) $(PRECOMPILED_HEADER) Makefile
+$(TEST): $(TEST_SOURCE) $(TEST_TEMPLATES) include $(PRECOMPILED_HEADER) Makefile
 	@echo "BUILD $@"
 	@mkdir -p $(dir $@)
 	@$(CXX) -DCATCH_CONFIG_MAIN -include "tests/catch.hpp" $(CXXFLAGS_debug) $< -o $@
 
-$(BENCHMARK): $(BENCHMARK_SOURCE) $(BENCHMARK_TEMPLATES) $(HEADERS) Makefile
+$(BENCHMARK): $(BENCHMARK_SOURCE) $(BENCHMARK_TEMPLATES) include Makefile
 	@echo "BUILD $@"
 	@mkdir -p $(dir $@)
 	@$(CXX) $(CXXFLAGS_release) $< -o $@
 
-$(BUILD_DIR)/%.htmltc: %.htmlt $(HTMLTPP) $(HEADERS) Makefile
+$(BUILD_DIR)/%.htmltc: % $(HTMLTPP) include Makefile
 	@echo "PREPROCESS $<"
 	@mkdir -p $(dir $@)
-	@$(HTMLTPP) $< $@
+	@$(HTMLTPP) $@ $(wildcard $</*.htmlt)
 
 
 clean:
 	@echo "CLEAN $(BUILD_DIR)"
 	@rm -Rf $(BUILD_DIR)
+
+full-clean: clean
 	@echo "CLEAN tests/catch.hpp.pch"
 	@rm -f tests/catch.hpp.pch
 

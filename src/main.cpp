@@ -2,42 +2,42 @@
 #include <iostream>
 #include <fstream>
 #include <stdexcept>
+#include <string.h>
 
 
-namespace {
+#define STATIC_STRING_VARIABLE_NAME "__serenity_templater_str"
+#define RESULT_VARIABLE_NAME "__serenity_templater_res"
 
 
-class preprocess {
-public:
+static void writeText(std::ostream & out, const std::string & text) {
+	out << "{static const char " STATIC_STRING_VARIABLE_NAME "[]={";
+	out << std::to_string(text[0]);
+	for (auto it = ++text.begin(); it != text.end(); it++) { out << ',' << std::to_string(*it); }
+	out << ",0";
+	out << "};" RESULT_VARIABLE_NAME "<<" STATIC_STRING_VARIABLE_NAME ";}";
+}
 
-	static std::string string(std::string s) {
-		std::string out;
-		preprocess(s, out);
-		return out;
-	}
+static void writeCommand(std::ostream & out, const std::string & command, const std::string & parameters) {
+	if ((command == "") && (parameters == "")) return;            // так надо
 
-	static std::string file(std::string fileName) {
-		return preprocess::string(readFile(fileName));
-	}
+	// simple expression
+	if (command == "")        out << RESULT_VARIABLE_NAME "<<" << parameters << ";"; else         // $(var)
+	// commands without parameters
+	if (command == "else")    out << "}else{"; else                        // $else
+	if (command == "end")     out << '}'; else                          // $end
+	// commands with parameters
+	if (parameters == "")     out << RESULT_VARIABLE_NAME "<<" << command << ";"; else            // $var
+	//if (command == "import")  return preprocess::file(parameters); else   // $import(file.htmlt)
+	//if (command == "include") return include(parameters); else            // $include(file.css)
+	if (command == "for")     out << "for(" << parameters << "){"; else               // $for (int i=0; else i<n; else i++)
+	if (command == "foreach") out << "for(const auto&" << parameters << "){"; else            // $foreach(item : collection)
+	if (command == "if")      out << "if(" << parameters << "){"; else                // $if (cond)
 
-private:
+	throw std::runtime_error("unknown command: $'" + command + "'('" + parameters + "')");
+}
 
-	static std::string readFile(std::string fileName) {
-  	std::ifstream in(fileName, std::ios::in | std::ios::binary);
-  	if (in) {
-    	std::string contents;
-    	in.seekg(0, std::ios::end);
-    	contents.resize((size_t)in.tellg());
-    	in.seekg(0, std::ios::beg);
-    	in.read(&contents[0], (std::streamsize)contents.size());
-    	in.close();
-			return contents;
-  	} else {
-			std::cerr << "reading file fail: " << (int)errno << std::endl;
-			return "";
-		}
-	}
-
+static void preprocess(std::istream & in, std::ostream & out, const std::string & templateName) {
+	out << "#define __SERENITY_TEMPLATER_TEMPLATE_" << templateName << " [&](){std::stringstream " RESULT_VARIABLE_NAME ";";
 
 	enum class State {
 		TEXT,                      // skipping to $
@@ -45,174 +45,74 @@ private:
 		DOLLAR_COMMAND_PARAMETERS  // skipping to matching )
 	};
 
-	const std::string & in;
-	std::string & out;
-	std::string quotesString;
-
 	State state = State::TEXT;
-	int bracketsDepth = 1;
-	std::string constantText;
-	std::string varOrCommandName;
-	std::string varOrCommandParameters;
+	std::string text;
+	std::string command;
+	std::string parameters;
+	int bracketsDepth = 0;
 
+	for (int c_int = in.get(); (c_int != std::char_traits<char>::eof()) && (in.good()); c_int = in.get()) {
+		char c = (char)c_int;
+		State newState = state;
 
-	preprocess(const std::string & in_, std::string & out_) : in(in_), out(out_) {
-		static const char alpha[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
-		quotesString.resize(16);
-		do {
-			for (size_t i=0; i<16; i++) quotesString[i] = alpha[(unsigned)rand() % (sizeof(alpha)-1)];
-		} while (in.find(quotesString) != std::string::npos);
-
-		out += fileStart();
-		for (auto it = std::begin(in); it != std::end(in); it++) {
-			preprocessChar(*it);
-		}
-		out += text(constantText);
-		out += command(varOrCommandName, varOrCommandParameters);
-		out += fileEnd();
-	}
-
-	void preprocessChar(char c) {
-		switch (state) {
-			case State::TEXT: preprocessCharInText(c); break;
-			case State::DOLLAR_COMMAND_NAME: preprocessCharInDollarCommandName(c); break;
-			case State::DOLLAR_COMMAND_PARAMETERS: preprocessCharInDollarCommandParameters(c); break;
-		}
-	}
-
-	void preprocessCharInText(char c) {
-		if (c == '$') {
-			setState(State::DOLLAR_COMMAND_NAME);
-		} else {
-			constantText += c;
-		}
-	}
-
-	void preprocessCharInDollarCommandName(char c) {
-		if (isalnum(c) || (c == '_')) {
-			varOrCommandName += c;
-		} else {
-			if (c == '(') {
-				setState(State::DOLLAR_COMMAND_PARAMETERS);
+		if (state == State::TEXT) {
+			if (c == '$') { newState = State::DOLLAR_COMMAND_NAME; } else { text += c; }
+		} else if (state == State::DOLLAR_COMMAND_NAME) {
+			if (isalnum(c) || (c == '_')) {
+				command += c;
+			} else if (c == '(') {
+				newState = State::DOLLAR_COMMAND_PARAMETERS;
+				bracketsDepth = 1;
 			} else {
-				setState(State::TEXT);
-				preprocessCharInText(c);
+				newState = State::TEXT;
+				if ((c == '$') && command.empty()) { text += c; } else { in.putback(c); }
 			}
+		} else if (state == State::DOLLAR_COMMAND_PARAMETERS) {
+			if (c == '(') { bracketsDepth++; }
+			if (c == ')') { bracketsDepth--; }
+			if (bracketsDepth > 0) { parameters += c; } else { newState = State::TEXT; }
 		}
-	}
 
-	void preprocessCharInDollarCommandParameters(char c) {
-		if (c == '(') {
-			bracketsDepth++;
-			varOrCommandParameters += c;
-		} else {
-			if (c == ')')  {
-				bracketsDepth--;
-				if (bracketsDepth == 0) {
-					setState(State::TEXT);
-				} else {
-					varOrCommandParameters += c;
-				}
-			} else {
-				varOrCommandParameters += c;
+		if (newState != state) {
+			if (newState == State::TEXT) {
+				if (!text.empty()) writeText(out, text);
+				if (!command.empty() || !parameters.empty()) writeCommand(out, command, parameters);
+
+				text.clear();
+				command.clear();
+				parameters.clear();
 			}
+
+			state = newState;
 		}
 	}
 
-	void setState(State newState) {
-		State oldState = state;
-		if ((oldState == State::TEXT) && ((newState == State::DOLLAR_COMMAND_NAME) || (newState == State::DOLLAR_COMMAND_PARAMETERS))) {
-			out += text(constantText);
-			constantText.clear();
-		}
-		if ((newState == State::TEXT) && ((oldState == State::DOLLAR_COMMAND_NAME) || (oldState == State::DOLLAR_COMMAND_PARAMETERS))) {
-			out += command(varOrCommandName, varOrCommandParameters);
-			bracketsDepth = 1;
-			varOrCommandName.clear();
-			varOrCommandParameters.clear();
-		}
-		state = newState;
-	}
+	if (!text.empty()) writeText(out, text);
+	if (!command.empty() || !parameters.empty()) writeCommand(out, command, parameters);
 
-	std::string fileStart() const {
-		return "[&]() {\n"
-			"#ifndef __SERENITY_TEMPLATER_HPP__INCLUDED__\n"
-			"#error \"You must #include <serenity/templater.hpp> to use templates\"\n"
-			"#endif\n"
-			"std::stringstream __res;";
-	}
-	std::string fileEnd() const { return "return __res.str(); }()\n"; }
+	out << "return " RESULT_VARIABLE_NAME ".str();}\n";
+}
 
-	std::string openQuotes() const { return "R\"" + quotesString + "("; }
-	std::string closeQuotes() const { return ")" + quotesString + "\""; }
-
-	std::string appendBegin() const { return "__res << "; }
-	std::string appendEnd() const { return ";"; }
-
-	std::string quoted(std::string s) const { return openQuotes() + s + closeQuotes(); }
-	std::string text(std::string text) const { return appendBegin() + quoted(text) + appendEnd(); }
-	std::string expression(std::string expr) const { return appendBegin() + expr + appendEnd(); }
-
-	std::string end() const { return "}"; }
-	std::string include(std::string fileName) const { return readFile(fileName); }
-	std::string for_(std::string parameters) const { return "for (" + parameters + ") {"; }
-	std::string foreach(std::string parameters) const { return for_("const auto &" + parameters); }
-	std::string if_(std::string condition) const { return "if (" + condition + ") {"; }
-	std::string else_() const { return "} else {"; }
-
-	std::string command(std::string command, std::string parameters) const {
-		if ((command == "") && (parameters == "")) return "";            // так надо
-
-		// simple expression
-		if (command == "")        return expression(parameters);         // $(var)
-		// commands without parameters
-		if (command == "$")       return "$";                            // $$
-		if (command == "else")    return else_();                        // $else
-		if (command == "end")     return end();                          // $end
-		// commands with parameters
-		if (parameters == "")     return expression(command);            // $var
-		if (command == "import")  return preprocess::file(parameters);   // $import(file.htmlt)
-		if (command == "include") return include(parameters);            // $include(file.css)
-		if (command == "for")     return for_(parameters);               // $for (int i=0; i<n; i++)
-		if (command == "foreach") return foreach(parameters);            // $foreach(item : collection)
-		if (command == "if")      return if_(parameters);                // $if (cond)
-
-		throw std::runtime_error("unknown command: $" + command + "(" + parameters + ")");
-	}
-};
-
-
+static std::string fileNameToTemplateName(const std::string & fileName) {
+	auto begin = fileName.find_last_of('/');
+	if (begin == std::string::npos) begin = 0;
+	auto end = fileName.find('.', begin);
+	if (end == std::string::npos) end = fileName.size()-1;
+	return fileName.substr(begin+1, end-begin-1);
 }
 
 
-
 int main(int argc, char ** argv) {
-	if (argc < 2) {
-		std::cerr << "Usage: " << argv[0] << " <input dir> <output dir>" << std::endl;
+	if ((argc < 2) || (strcmp(argv[1], "-h") == 0) || (strcmp(argv[1], "--help") == 0)) {
+		printf("Usage:\n  %s output-file.htmltc input-file1.htmlt ... input-fileN.htmlt", argv[0]);
 		return 1;
 	}
 
-	std::ofstream(argv[2], std::ios_base::binary) << preprocess::file(argv[1]);
-
-	/*boost::filesystem::path inputDir(argv[1]);
-	boost::filesystem::path outputDir(argv[2]);
-	try {
-		boost::filesystem::create_directory(outputDir);
-	} catch (...) {
+	std::ofstream out(argv[1]);
+	out << "#include <serenity/templater.hpp>\n";
+	for (int i=2; i<argc; i++) {
+  	std::ifstream in(argv[i], std::ios::in | std::ios::binary);
+		preprocess(in, out, fileNameToTemplateName(argv[i]));
 	}
-	for (
-		auto it = boost::filesystem::directory_iterator(inputDir);
-		it != boost::filesystem::directory_iterator();
-		it++
-	) {
-		if (it->path().extension() == ".htmlt") {
-			std::cout << *it << std::endl;
-			auto inputFileName = it->path().string();
-			auto outputFileName = (outputDir / (it->path().filename().string() + "c")).string();
-			std::ofstream(outputFileName, std::ios_base::binary) << preprocess::file(inputFileName);
-		}
-	}*/
-
-
 	return 0;
 }

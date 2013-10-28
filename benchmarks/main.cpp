@@ -1,10 +1,9 @@
-#include "hayai.hpp"
-#include <serenity/templater.hpp>
+#include "benchmarker.hpp"
+#include <benchmarks/templates.htmltc>
 #include <assert.h>
 
 
 int dataInt[1000];
-
 
 __attribute__((constructor)) static void init() {
 	for (auto & x : dataInt) {
@@ -13,16 +12,14 @@ __attribute__((constructor)) static void init() {
 }
 
 
-BENCHMARK(templater, int, 10, 100) {
-	const auto & data = dataInt;
-	std::string res =
-#	include <benchmarks/templates/array1000.htmltc>
-	;
-	assert(res.back() == '\n');
-}
-
 
 int main() {
-	Hayai::Benchmarker::RunAllTests();
-	return 0;
+	BENCHMARK("1000 variables") {
+		const auto & data = dataInt;
+		std::string res = TEMPLATE(array1000);
+		assert(res.back() == '\n');
+	};
+
+	serenity::benchmarker::run();
 }
+
