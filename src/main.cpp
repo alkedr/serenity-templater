@@ -13,8 +13,7 @@ static void writeText(std::ostream & out, const std::string & text) {
 	out << "{static const char " STATIC_STRING_VARIABLE_NAME "[]={";
 	out << std::to_string(text[0]);
 	for (auto it = ++text.begin(); it != text.end(); it++) { out << ',' << std::to_string(*it); }
-	out << ",0";
-	out << "};" RESULT_VARIABLE_NAME "<<" STATIC_STRING_VARIABLE_NAME ";}";
+	out << "};" RESULT_VARIABLE_NAME ".write(" STATIC_STRING_VARIABLE_NAME ",sizeof(" STATIC_STRING_VARIABLE_NAME "));}";
 }
 
 static void writeCommand(std::ostream & out, const std::string & command, const std::string & parameters) {
