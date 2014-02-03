@@ -19,7 +19,7 @@ endif
 
 HEADERS := $(wildcard include/*.hpp)
 
-PRECOMPILED_HEADER := tests/catch.hpp.pch
+PRECOMPILED_CATCH := tests/catch.hpp.pch
 
 HTMLTPP_SOURCE := src/main.cpp
 HTMLTPP := $(BUILD_DIR)/serenity-htmltpp
@@ -46,7 +46,7 @@ run-%: build/%
 	@echo "RUN   $<"
 	@$<
 
-$(PRECOMPILED_HEADER): tests/catch.hpp Makefile
+$(PRECOMPILED_CATCH): tests/catch.hpp Makefile
 	@echo "PRECOMPILE $@"
 	@mkdir -p $(dir $@)
 	@$(CXX) -x c++-header -DCATCH_CONFIG_MAIN -Wno-unused-macros $(CXXFLAGS_debug) $< -o $@
@@ -56,7 +56,7 @@ $(HTMLTPP): $(HTMLTPP_SOURCE) include Makefile
 	@mkdir -p $(dir $@)
 	@$(CXX) $(CXXFLAGS) $< -o $@
 
-$(TEST): $(TEST_SOURCE) $(TEST_TEMPLATES) include $(PRECOMPILED_HEADER) Makefile
+$(TEST): $(TEST_SOURCE) $(TEST_TEMPLATES) include $(PRECOMPILED_CATCH) Makefile
 	@echo "BUILD $@"
 	@mkdir -p $(dir $@)
 	@$(CXX) -DCATCH_CONFIG_MAIN -include "tests/catch.hpp" $(CXXFLAGS_debug) $< -o $@
@@ -77,6 +77,6 @@ clean:
 	@rm -Rf $(BUILD_DIR)
 
 full-clean: clean
-	@echo "CLEAN tests/catch.hpp.pch"
-	@rm -f tests/catch.hpp.pch
+	@echo "CLEAN $(PRECOMPILED_CATCH)"
+	@rm -f $(PRECOMPILED_CATCH)
 
