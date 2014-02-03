@@ -54,7 +54,7 @@ $(PRECOMPILED_HEADER): tests/catch.hpp Makefile
 $(HTMLTPP): $(HTMLTPP_SOURCE) include Makefile
 	@echo "BUILD $@"
 	@mkdir -p $(dir $@)
-	@$(CXX) $(CXXFLAGS) -lboost_program_options $< -o $@
+	@$(CXX) $(CXXFLAGS) $< -o $@
 
 $(TEST): $(TEST_SOURCE) $(TEST_TEMPLATES) include $(PRECOMPILED_HEADER) Makefile
 	@echo "BUILD $@"
