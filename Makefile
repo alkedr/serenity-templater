@@ -3,14 +3,16 @@ BUILD_DIR := build
 
 CXX := clang++ -std=c++11
 
-CXXFLAGS_common  := -Iinclude -Ibuild -Weverything -Wno-c++98-compat -Wno-c++98-compat-pedantic -Wno-global-constructors -Wno-exit-time-destructors -Wno-missing-variable-declarations  -Wno-deprecated
+CXXFLAGS_common  := -Iinclude -Ibuild
 CXXFLAGS_release := $(CXXFLAGS_common) -O3 -flto -s
+CXXFLAGS_debug   := $(CXXFLAGS_common) -ggdb3
+
+CXXFLAGS_warnings := -Weverything -Wno-c++98-compat -Wno-c++98-compat-pedantic -Wno-global-constructors -Wno-exit-time-destructors -Wno-deprecated
+CXXFLAGS_no_warnings := -w -Wno-deprecated
 
 ifeq ($(RELEASE), y)
-	CXXFLAGS_debug := $(CXXFLAGS_common)
 	CXXFLAGS := $(CXXFLAGS_release)
 else
-	CXXFLAGS_debug := $(CXXFLAGS_common) -ggdb3
 	CXXFLAGS := $(CXXFLAGS_debug)
 endif
 
@@ -49,22 +51,22 @@ run-%: build/%
 $(PRECOMPILED_CATCH): tests/catch.hpp Makefile
 	@echo "PRECOMPILE $@"
 	@mkdir -p $(dir $@)
-	@$(CXX) -x c++-header -DCATCH_CONFIG_MAIN -Wno-unused-macros $(CXXFLAGS_debug) $< -o $@
+	@$(CXX) -x c++-header -DCATCH_CONFIG_MAIN -Wno-unused-macros $(CXXFLAGS_debug) $(CXXFLAGS_no_warnings) $< -o $@
 
 $(HTMLTPP): $(HTMLTPP_SOURCE) include Makefile
 	@echo "BUILD $@"
 	@mkdir -p $(dir $@)
-	@$(CXX) $(CXXFLAGS) $< -o $@
+	@$(CXX) $(CXXFLAGS) $(CXXFLAGS_warnings) $< -o $@
 
 $(TEST): $(TEST_SOURCE) $(TEST_TEMPLATES) include $(PRECOMPILED_CATCH) Makefile
 	@echo "BUILD $@"
 	@mkdir -p $(dir $@)
-	@$(CXX) -DCATCH_CONFIG_MAIN -include "tests/catch.hpp" $(CXXFLAGS_debug) $< -o $@
+	@$(CXX) -DCATCH_CONFIG_MAIN -include "tests/catch.hpp" $(CXXFLAGS_debug) $(CXXFLAGS_warnings) $< -o $@
 
 $(BENCHMARK): $(BENCHMARK_SOURCE) $(BENCHMARK_TEMPLATES) include Makefile
 	@echo "BUILD $@"
 	@mkdir -p $(dir $@)
-	@$(CXX) $(CXXFLAGS_release) $< -o $@
+	@$(CXX) $(CXXFLAGS_release) $(CXXFLAGS_warnings) $< -o $@
 
 $(BUILD_DIR)/%.htmltc: % $(HTMLTPP) include Makefile
 	@echo "PREPROCESS $<"
@@ -79,4 +81,3 @@ clean:
 full-clean: clean
 	@echo "CLEAN $(PRECOMPILED_CATCH)"
 	@rm -f $(PRECOMPILED_CATCH)
-
