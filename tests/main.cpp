@@ -1,6 +1,8 @@
 #include <tests/templates.htmltc>
 
 
+namespace {
+
 const char * correctAnswer = R"(<html>
 <body>
 <h1>Hello!</h1>
@@ -77,3 +79,4 @@ TEST_CASE( "preprocess formatted floats" ) {
 	CHECK( res == correctAnswer );
 }
 
+}

@@ -2,6 +2,7 @@
 #include <benchmarks/templates.htmltc>
 #include <assert.h>
 
+namespace {
 
 int dataInt[1000];
 
@@ -11,6 +12,7 @@ __attribute__((constructor)) static void init() {
 	}
 }
 
+}
 
 
 int main() {
