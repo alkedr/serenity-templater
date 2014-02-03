@@ -28,10 +28,10 @@ void writeCommand(std::ostream & out, const std::string & command, const std::st
 	if (parameters == "")     out << RESULT_VARIABLE_NAME "<<" << command << ";"; else  // $var
 	if (command == "for")     out << "for(" << parameters << "){"; else        // $for (int i=0; i<n; i++)
 	if (command == "foreach") out << "for(auto&&" << parameters << "){"; else  // $foreach(item : collection)
-	if (command == "if")      out << "if(" << parameters << "){"; else         // $if (cond)
-
-	std::cerr << "unknown command: $'" << command << "'('" << parameters << "')";
-	returnCode = 1;
+	if (command == "if")      out << "if(" << parameters << "){"; else {         // $if (cond)
+		std::cout << "unknown command: $'" << command << "'('" << parameters << "')";
+		returnCode = 1;
+	}
 }
 
 void preprocess(std::istream & in, std::ostream & out, const std::string & templateName) {
