@@ -1,47 +1,46 @@
 #include <string>
 #include <iostream>
 #include <fstream>
-#include <stdexcept>
-#include <string.h>
 
 
 #define STATIC_STRING_VARIABLE_NAME "__serenity_templater_str"
 #define RESULT_VARIABLE_NAME "__serenity_templater_res"
+#define MACRO_PREFIX "__SERENITY_TEMPLATER_TEMPLATE_"
 
 
-static void writeText(std::ostream & out, const std::string & text) {
+namespace {
+
+int returnCode = 0;
+
+void writeText(std::ostream & out, const std::string & text) {
 	out << "{static const char " STATIC_STRING_VARIABLE_NAME "[]={";
 	out << std::to_string(text[0]);
 	for (auto it = ++text.begin(); it != text.end(); it++) { out << ',' << std::to_string(*it); }
 	out << "};" RESULT_VARIABLE_NAME ".write(" STATIC_STRING_VARIABLE_NAME ",sizeof(" STATIC_STRING_VARIABLE_NAME "));}";
 }
 
-static void writeCommand(std::ostream & out, const std::string & command, const std::string & parameters) {
-	if ((command == "") && (parameters == "")) return;            // так надо
+void writeCommand(std::ostream & out, const std::string & command, const std::string & parameters) {
+	if ((command == "") && (parameters == "")) return;
 
-	// simple expression
-	if (command == "")        out << RESULT_VARIABLE_NAME "<<" << parameters << ";"; else         // $(var)
-	// commands without parameters
-	if (command == "else")    out << "}else{"; else                        // $else
-	if (command == "end")     out << '}'; else                          // $end
-	// commands with parameters
-	if (parameters == "")     out << RESULT_VARIABLE_NAME "<<" << command << ";"; else            // $var
-	//if (command == "import")  return preprocess::file(parameters); else   // $import(file.htmlt)
-	//if (command == "include") return include(parameters); else            // $include(file.css)
-	if (command == "for")     out << "for(" << parameters << "){"; else               // $for (int i=0; else i<n; else i++)
-	if (command == "foreach") out << "for(const auto&" << parameters << "){"; else            // $foreach(item : collection)
-	if (command == "if")      out << "if(" << parameters << "){"; else                // $if (cond)
+	if (command == "")        out << RESULT_VARIABLE_NAME "<<" << parameters << ";"; else  // $(var)
+	if (command == "else")    out << "}else{"; else  // $else
+	if (command == "end")     out << "}"; else       // $end
+	if (parameters == "")     out << RESULT_VARIABLE_NAME "<<" << command << ";"; else  // $var
+	if (command == "for")     out << "for(" << parameters << "){"; else        // $for (int i=0; i<n; i++)
+	if (command == "foreach") out << "for(auto&&" << parameters << "){"; else  // $foreach(item : collection)
+	if (command == "if")      out << "if(" << parameters << "){"; else         // $if (cond)
 
-	throw std::runtime_error("unknown command: $'" + command + "'('" + parameters + "')");
+	std::cerr << "unknown command: $'" << command << "'('" << parameters << "')";
+	returnCode = 1;
 }
 
-static void preprocess(std::istream & in, std::ostream & out, const std::string & templateName) {
-	out << "#define __SERENITY_TEMPLATER_TEMPLATE_" << templateName << " [&](){std::stringstream " RESULT_VARIABLE_NAME ";";
+void preprocess(std::istream & in, std::ostream & out, const std::string & templateName) {
+	out << "#define " MACRO_PREFIX << templateName << " [&](){std::stringstream " RESULT_VARIABLE_NAME ";";
 
 	enum class State {
 		TEXT,                      // skipping to $
-		DOLLAR_COMMAND_NAME,       // skipping to ( or non-alphanumeric
-		DOLLAR_COMMAND_PARAMETERS  // skipping to matching )
+		DOLLAR_COMMAND_NAME,       // skipping to '( or non-alphanumeric
+		DOLLAR_COMMAND_PARAMETERS  // skipping to matching ')'
 	};
 
 	State state = State::TEXT;
@@ -92,7 +91,7 @@ static void preprocess(std::istream & in, std::ostream & out, const std::string 
 	out << "return " RESULT_VARIABLE_NAME ".str();}\n";
 }
 
-static std::string fileNameToTemplateName(const std::string & fileName) {
+std::string fileNameToTemplateName(const std::string & fileName) {
 	auto begin = fileName.find_last_of('/');
 	if (begin == std::string::npos) begin = 0;
 	auto end = fileName.find('.', begin);
@@ -100,18 +99,20 @@ static std::string fileNameToTemplateName(const std::string & fileName) {
 	return fileName.substr(begin+1, end-begin-1);
 }
 
+}
+
 
 int main(int argc, char ** argv) {
-	if ((argc < 2) || (strcmp(argv[1], "-h") == 0) || (strcmp(argv[1], "--help") == 0)) {
+	if ((argc < 2) || (std::string(argv[1]) == "-h") || (std::string(argv[1]) == "--help")) {
 		printf("Usage:\n  %s output-file.htmltc input-file1.htmlt ... input-fileN.htmlt", argv[0]);
 		return 1;
 	}
 
 	std::ofstream out(argv[1]);
 	out << "#include <serenity/templater.hpp>\n";
-	for (int i=2; i<argc; i++) {
+	for (int i = 2; i < argc; i++) {
   	std::ifstream in(argv[i], std::ios::in | std::ios::binary);
 		preprocess(in, out, fileNameToTemplateName(argv[i]));
 	}
-	return 0;
+	return returnCode;
 }

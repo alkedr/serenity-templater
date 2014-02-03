@@ -3,7 +3,7 @@ BUILD_DIR := build
 
 CXX := clang++ -std=c++11
 
-CXXFLAGS_common  := -Iinclude -Ibuild -Weverything -Wno-c++98-compat -Wno-c++98-compat-pedantic -Wno-global-constructors -Wno-exit-time-destructors -Wno-missing-variable-declarations
+CXXFLAGS_common  := -Iinclude -Ibuild -Weverything -Wno-c++98-compat -Wno-c++98-compat-pedantic -Wno-global-constructors -Wno-exit-time-destructors -Wno-missing-variable-declarations  -Wno-deprecated
 CXXFLAGS_release := $(CXXFLAGS_common) -O3 -flto -s
 
 ifeq ($(RELEASE), y)
